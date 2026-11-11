@@ -1,13 +1,6 @@
 // Load .env without extra dependencies.
-const fs = require('fs');
 const path = require('path');
-const envFile = path.join(__dirname, '.env');
-if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-  }
-}
+require('./src/env').loadEnv(path.join(__dirname, '.env'));
 
 // All dates and fine times follow the office clock, even if the server is in another country.
 process.env.TZ = process.env.TZ || process.env.OFFICE_TIMEZONE || 'Asia/Karachi';

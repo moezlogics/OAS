@@ -8,7 +8,8 @@
     "start": "node server.js",
     "test": "node tests/test_rules.js && node tests/test_api.js",
     "seed": "node scripts/seed_demo_data.js",
-    "icons": "node scripts/make_icons.js"
+    "icons": "node scripts/make_icons.js",
+    "reset-admin": "node scripts/reset_admin_password.js"
   },
   "engines": {
     "node": ">=18"

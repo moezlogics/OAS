@@ -181,6 +181,17 @@ If your hosting has **Setup Node.js App** in cPanel: create an app with root `of
 
 ---
 
+### Admin password not working?
+- `ADMIN_PASSWORD` in `.env` must be **at least 8 characters**. Shorter ones are ignored (the log says so: `pm2 logs office-attendance`).
+- After editing `.env`, restart: `pm2 restart office-attendance`. The new value is applied on start.
+- The username is `admin`.
+- Fastest fix, any time, on the server:
+  ```bash
+  cd /var/www/office-attendance
+  npm run reset-admin -- "MyNewPassword123"
+  ```
+- Shown "Too many wrong tries"? Wait 15 minutes or run `pm2 restart office-attendance`.
+
 ## Security checklist (before going live)
 
 The app already does these by itself:

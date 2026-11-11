@@ -460,9 +460,7 @@ router.post('/settings/change-password', (req, res) => {
   if (!db.verifyPassword(current_password, s.admin_password_hash, s.admin_password_salt)) {
     return res.status(401).json({ success: false, message: 'Your current password is wrong.' });
   }
-  const { hash, salt } = db.hashPassword(new_password);
-  const updated = db.updateSettings({ admin_password_hash: hash, admin_password_salt: salt, admin_session_version: (s.admin_session_version || 0) + 1, admin_password_initial: false });
-  try { require('fs').unlinkSync(db.FIRST_PASSWORD_FILE); } catch (e) { /* not there */ }
+  const updated = db.setAdminPassword(String(new_password));
   // Sign out every other device, keep this one signed in.
   const token = startSession(req, res, 'admin_token', { role: 'admin', username: updated.admin_username, v: updated.admin_session_version });
   res.json({ success: true, message: 'Password changed. Other devices were signed out.', token });

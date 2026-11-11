@@ -137,22 +137,60 @@ function normalizeLeave(l) {
   return leave;
 }
 
+// ADMIN_PASSWORD from .env. Used on the first start, and again every time its value
+// changes in .env (so editing .env + restarting always resets the admin password).
+// A password changed in Settings stays until ADMIN_PASSWORD in .env is changed again.
+const MIN_ADMIN_PASSWORD = 8;
+const envFingerprint = v => crypto.createHash('sha256').update(`admin-env:${v}`).digest('hex');
+function envAdminPassword() {
+  const v = String(process.env.ADMIN_PASSWORD || '').trim();
+  if (!v) return null;
+  if (v.length < MIN_ADMIN_PASSWORD) {
+    console.warn(`\n  ADMIN_PASSWORD in .env is shorter than ${MIN_ADMIN_PASSWORD} characters, so it was NOT used.\n  Use a longer one and restart, or run: npm run reset-admin -- "NewPassword"\n`);
+    return null;
+  }
+  return v;
+}
+
 function initDB() {
   const existing = readJSON(SETTINGS_FILE);
+  const fromEnv = envAdminPassword();
   if (!existing) {
-    const fromEnv = process.env.ADMIN_PASSWORD || '';
-    const weak = !fromEnv || fromEnv.length < 8 || /^(admin|password|12345)/i.test(fromEnv);
-    let first = fromEnv || 'admin123';
-    if (process.env.NODE_ENV === 'production' && weak) {
-      // Make a random one and leave it in a private file for the first sign-in.
-      first = crypto.randomBytes(9).toString('base64url');
-      fs.writeFileSync(FIRST_PASSWORD_FILE, `Admin username: admin\nFirst password: ${first}\n\nSign in at /admin and change it in Settings. This file is deleted when you do.\n`, { mode: 0o600 });
-      console.warn(`\n  First admin password saved in ${FIRST_PASSWORD_FILE}\n  (ADMIN_PASSWORD in .env was missing or too weak.)\n`);
+    let first = fromEnv;
+    let initial = false;
+    if (!first) {
+      initial = true;
+      if (process.env.NODE_ENV === 'production') {
+        // No usable password in .env: make a random one and leave it in a private file.
+        first = crypto.randomBytes(9).toString('base64url');
+        fs.writeFileSync(FIRST_PASSWORD_FILE, `Admin username: admin\nFirst password: ${first}\n\nSign in at /admin and change it in Settings. This file is deleted when you do.\n`, { mode: 0o600 });
+        console.warn(`\n  First admin password saved in ${FIRST_PASSWORD_FILE}\n`);
+      } else {
+        first = 'admin123'; // local testing only
+      }
     }
     const admin = hashPassword(first);
-    safeWriteJSON(SETTINGS_FILE, { ...DEFAULT_SETTINGS, tracking_started_on: localDateKey(), admin_password_initial: true, admin_password_hash: admin.hash, admin_password_salt: admin.salt });
+    safeWriteJSON(SETTINGS_FILE, {
+      ...DEFAULT_SETTINGS, tracking_started_on: localDateKey(), admin_password_initial: initial,
+      admin_password_hash: admin.hash, admin_password_salt: admin.salt,
+      admin_password_env: fromEnv ? envFingerprint(fromEnv) : null
+    });
+    if (fromEnv) console.log('  Admin password set from ADMIN_PASSWORD in .env.');
   } else {
     const s = normalizeSettings(existing);
+    if (fromEnv && s.admin_password_env !== envFingerprint(fromEnv)) {
+      // .env has a new admin password: use it (unless it is already the current one).
+      if (!verifyPassword(fromEnv, s.admin_password_hash, s.admin_password_salt)) {
+        const up = hashPassword(fromEnv);
+        s.admin_password_hash = up.hash;
+        s.admin_password_salt = up.salt;
+        s.admin_session_version = (s.admin_session_version || 0) + 1; // sign out old admin sessions
+      }
+      s.admin_password_env = envFingerprint(fromEnv);
+      s.admin_password_initial = false;
+      try { fs.unlinkSync(FIRST_PASSWORD_FILE); } catch (e) { /* not there */ }
+      console.log('  Admin password updated from ADMIN_PASSWORD in .env.');
+    }
     if (!s.tracking_started_on) {
       // Older installs: start from the first attendance record, or today.
       const first = (readJSON(ATTENDANCE_FILE) || []).map(a => a.date).filter(Boolean).sort()[0];
@@ -180,8 +218,22 @@ function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
 }
 
+// Set a new admin password (used by Settings and by "npm run reset-admin").
+function setAdminPassword(password) {
+  const pw = String(password || '');
+  if (pw.length < MIN_ADMIN_PASSWORD) throw new Error(`The password must be at least ${MIN_ADMIN_PASSWORD} characters.`);
+  const current = normalizeSettings(readJSON(SETTINGS_FILE) || {});
+  const { hash, salt } = hashPassword(pw);
+  const updated = { ...current, admin_password_hash: hash, admin_password_salt: salt, admin_session_version: (current.admin_session_version || 0) + 1, admin_password_initial: false };
+  safeWriteJSON(SETTINGS_FILE, updated);
+  try { fs.unlinkSync(FIRST_PASSWORD_FILE); } catch (e) { /* not there */ }
+  return updated;
+}
+
 const db = {
   initDB,
+  setAdminPassword,
+  MIN_ADMIN_PASSWORD,
   hashPassword,
   verifyPassword,
   isOldHash,
