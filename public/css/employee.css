@@ -1,0 +1,70 @@
+/* Employee app */
+
+/* ---------- Sign in ---------- */
+.login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); }
+.login-inner { width: 100%; max-width: 400px; }
+.login-brand { display: grid; justify-items: center; gap: 12px; text-align: center; margin-bottom: 28px; }
+.login-brand img { width: 64px; height: 64px; border-radius: 18px; }
+.login-brand h1 { font-size: 24px; }
+.login-brand p { color: var(--muted); }
+.login-time { font: 700 15px/1 var(--font); color: var(--muted); }
+.login-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 20px 18px 18px; box-shadow: var(--shadow); }
+.login-note { text-align: center; color: var(--muted); font-size: 14px; margin-top: 14px; }
+.wifi-line { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.wifi-line.ok { color: var(--ontime); }
+.wifi-line.no { color: var(--late); }
+.login-foot { text-align: center; margin-top: 16px; }
+
+/* ---------- Greeting ---------- */
+.hello { padding: 6px 2px 2px; }
+.hello h2 { font-size: 24px; }
+.hello p { color: var(--muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+
+/* ---------- Today card ---------- */
+.today { border-radius: var(--r-l); padding: 18px 16px 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.today::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 4px; background: var(--ontime); }
+.today.s-warn::before { background: var(--late); }
+.today.s-bad::before { background: var(--absent); }
+.today.s-calm::before { background: var(--leave); }
+.today.s-off::before { background: var(--off); }
+.today-kicker { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--ontime); }
+.s-warn .today-kicker { color: var(--late); }
+.s-bad .today-kicker { color: var(--absent); }
+.s-calm .today-kicker { color: var(--leave); }
+.s-off .today-kicker { color: var(--muted); }
+.today-head { font: 700 34px/1.1 var(--font-num); letter-spacing: -0.02em; margin: 6px 0 6px; font-variant-numeric: tabular-nums; }
+.today-sub { color: var(--ink-2); font-size: 16px; }
+.today-times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.today-times div { background: var(--surface-2); border-radius: 12px; padding: 8px 10px; }
+.today-times span { display: block; font-size: 13px; color: var(--muted); }
+.today-times b { display: block; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.today-action { display: grid; gap: 8px; margin-top: 16px; }
+.today-hint { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--late); font-size: 14px; font-weight: 600; text-align: center; }
+
+/* ---------- Streak ---------- */
+.streak { display: flex; align-items: center; gap: 14px; }
+.streak-num { display: flex; align-items: center; gap: 4px; font: 700 28px/1 var(--font-num); color: var(--late); flex: none; }
+.streak-num .icon { width: 26px; height: 26px; fill: currentColor; stroke: none; }
+.streak.cold .streak-num { color: var(--off); }
+.streak b { display: block; }
+
+
+/* ---------- Notifications ---------- */
+.ntf { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.ntf:first-child { border-top: 0; }
+.ntf > i { width: 9px; height: 9px; border-radius: 50%; background: var(--brand); flex: none; margin-top: 7px; }
+.ntf.good > i { background: var(--ontime); } .ntf.warn > i { background: var(--late); } .ntf.announcement > i { background: var(--leave); }
+.ntf.seen > i { background: var(--line-strong); }
+.ntf b { display: block; }
+.ntf p { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+.ntf small { color: var(--muted); font-size: 13px; }
+
+/* ---------- Profile ---------- */
+.profile-head { display: flex; align-items: center; gap: 14px; padding: 4px 2px; }
+.profile-head h2 { font-size: 22px; }
+.month-bar { display: flex; align-items: center; justify-content: space-between; }
+.month-bar h2 { font-size: 18px; }
+
+@media (min-width: 760px) {
+  .page { padding-top: 12px; }
+}

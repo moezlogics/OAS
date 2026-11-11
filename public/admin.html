@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Admin">
+  <meta name="robots" content="noindex">
+  <title>Admin</title>
+  <link rel="manifest" href="/admin.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css?v=10">
+  <link rel="stylesheet" href="/css/admin.css?v=10">
+</head>
+<body>
+  <!-- Sign in -->
+  <section id="login" class="a-login" hidden>
+    <form id="loginForm" class="a-login-card" novalidate>
+      <img src="/icons/icon-192.png" alt="" class="a-login-logo">
+      <h1>Admin sign in</h1>
+      <p class="muted">Attendance, fines, requests and reports.</p>
+      <label class="field"><span>Username</span><input class="input input-lg" name="username" autocomplete="username" autocapitalize="none" required></label>
+      <label class="field"><span>Password</span><input class="input input-lg" name="password" type="password" autocomplete="current-password" required></label>
+      <p class="form-error" id="loginError" role="alert" hidden></p>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in</button>
+      <p class="muted small center" style="margin-top:12px">You stay signed in on this device.</p>
+      <div class="center" style="margin-top:6px"><button type="button" class="btn btn-ghost btn-s" data-install hidden><span data-icon="download"></span>Install the admin app</button></div>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" class="shell" hidden>
+    <aside class="side">
+      <a class="mark-logo" href="#dashboard"><img src="/icons/icon-192.png" alt=""><span data-office>Attendance</span></a>
+      <nav class="side-nav" aria-label="Admin">
+        <a href="#dashboard" data-tab="dashboard"><span data-icon="home"></span>Home</a>
+        <a href="#attendance" data-tab="attendance"><span data-icon="clock"></span>Attendance</a>
+        <a href="#team" data-tab="team"><span data-icon="users"></span>Team</a>
+        <a href="#requests" data-tab="requests"><span data-icon="inbox"></span>Requests <b class="count" data-pending hidden></b></a>
+        <a href="#fines" data-tab="fines"><span data-icon="wallet"></span>Fines</a>
+        <a href="#reports" data-tab="reports"><span data-icon="chart"></span>Reports</a>
+        <a href="#settings" data-tab="settings"><span data-icon="settings"></span>Settings</a>
+      </nav>
+      <div class="side-foot">
+        <button class="btn btn-ghost btn-block" data-install hidden><span data-icon="download"></span>Install app</button>
+        <button class="btn btn-ghost btn-block" data-logout><span data-icon="logout"></span>Sign out</button>
+      </div>
+    </aside>
+
+    <header class="topbar mtop">
+      <h1 id="pageTitle">Home</h1>
+      <span id="topActions" style="display:flex"></span>
+    </header>
+
+    <main class="main" id="view" tabindex="-1"></main>
+
+    <nav class="tabbar" aria-label="Admin">
+      <div class="tabbar-inner">
+        <a href="#dashboard" data-tab="dashboard"><span data-icon="home"></span>Home</a>
+        <a href="#attendance" data-tab="attendance"><span data-icon="clock"></span>Attendance</a>
+        <a href="#team" data-tab="team"><span data-icon="users"></span>Team</a>
+        <a href="#requests" data-tab="requests"><span data-icon="inbox"></span>Requests<b class="count" data-pending hidden></b></a>
+        <button type="button" id="moreBtn" data-tab="more"><span data-icon="more"></span>More</button>
+      </div>
+    </nav>
+  </div>
+
+  <script src="/js/common.js?v=10"></script>
+  <script src="/js/admin.js?v=10"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "office_name": "Media Linkers",
+  "office_ips": [
+    "127.0.0.1",
+    "::1",
+    "::ffff:127.0.0.1"
+  ],
+  "enforce_ip_attendance": false,
+  "enforce_ip_admin": false,
+  "office_start_time": "09:30",
+  "grace_minutes": 0,
+  "fine_per_hour": 100,
+  "office_end_time": "17:00",
+  "missed_checkout_fine": 50,
+  "absent_fine": 300,
+  "weekly_off_days": [
+    0
+  ],
+  "holidays": [
+    {
+      "date": "2026-11-09",
+      "name": "Iqbal Day"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Quaid-e-Azam Day"
+    }
+  ],
+  "bind_device": false,
+  "timezone": "Asia/Karachi",
+  "admin_username": "admin",
+  "admin_session_version": 0,
+  "admin_password_initial": false,
+  "tracking_started_on": "2026-10-01",
+  "push_admin": {
+    "leave_request": true,
+    "late_checkin": true,
+    "every_checkin": false,
+    "early_checkout": true,
+    "morning_summary": true,
+    "missed_checkout": true,
+    "device_blocked": true
+  },
+  "push_employee": {
+    "checkin_reminder": true,
+    "checkout_reminder": true,
+    "decisions": true,
+    "announcements": true
+  },
+  "admin_password_hash": "c0ecf1fd377e45b46c53f582fbf615526e23c3a3d987e6547cfc2c3163f4469e4d89f4148a0356eb1971c17c71f430ccf4a1282140f10990a52895883a191c34",
+  "admin_password_salt": "8b2b01dfe6e289fc072cb5fa75f02c22"
+}

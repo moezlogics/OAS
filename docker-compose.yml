@@ -1,0 +1,17 @@
+services:
+  attendance:
+    build: .
+    container_name: office-attendance
+    restart: always
+    ports:
+      - "127.0.0.1:3112:3112" # only Nginx on this server reaches the app
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3112
+      - HOST=0.0.0.0              # inside the container; the port is only published on 127.0.0.1
+      - TRUST_PROXY=uniquelocal   # Nginx reaches the container over the Docker network
+      - TZ=Asia/Karachi
+    volumes:
+      # Employees, attendance, fines and settings live here (JSON files)
+      - ./data:/app/data

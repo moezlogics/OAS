@@ -1,0 +1,44 @@
+# Nginx site for office.medialinkers.pk -> Node app on 127.0.0.1:3112
+# Save as /etc/nginx/sites-available/office.medialinkers.pk, then:
+#   sudo ln -s /etc/nginx/sites-available/office.medialinkers.pk /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d office.medialinkers.pk     (adds HTTPS, needed for install and push)
+
+# Slow down password guessing before it even reaches the app: 10 sign-in tries per minute per IP.
+limit_req_zone $binary_remote_addr zone=attendance_login:10m rate=10r/m;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name office.medialinkers.pk;
+
+    server_tokens off;          # don't show the Nginx version
+    client_max_body_size 200k;  # the app never needs big uploads
+
+    # Let's Encrypt (certbot) needs this folder.
+    location ^~ /.well-known/acme-challenge/ { root /var/www/html; }
+
+    # Never serve hidden files (.env, .git ...), even by mistake.
+    location ~ /\. { deny all; return 404; }
+
+    location ~ ^/api/(admin/)?login$ {
+        limit_req zone=attendance_login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://127.0.0.1:3112;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3112;
+        proxy_http_version 1.1;
+        # These tell the app the visitor's real IP. The office WiFi lock depends on them.
+        # $remote_addr (not $proxy_add_x_forwarded_for) so a visitor can't add a fake IP to the list.
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
