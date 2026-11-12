@@ -125,8 +125,8 @@ router.get('/attendance', (req, res) => {
 
 // ---------- Sir decides the fine for any day ----------
 router.post('/fine/adjust', (req, res) => {
-  const { attendance_id, employee_code, date, new_fine, note } = req.body;
-  if (new_fine === undefined || new_fine === null || new_fine === '' || Number(new_fine) < 0 || Number.isNaN(Number(new_fine))) {
+  const { attendance_id, employee_code, date, new_fine, note, reset } = req.body;
+  if (!reset && (new_fine === undefined || new_fine === null || new_fine === '' || Number(new_fine) < 0 || Number.isNaN(Number(new_fine)))) {
     return res.status(400).json({ success: false, message: 'Enter the fine amount (0 = waive).' });
   }
 
@@ -146,6 +146,13 @@ router.post('/fine/adjust', (req, res) => {
 
   const ctx = E.buildContext();
   const before = emp ? E.resolveDay(emp, record.date, ctx).fine : record.auto_fine;
+  if (reset) {
+    // Back to the fine the rules give (undo the admin's change).
+    const saved = db.recordAttendance({ ...record, adjusted_fine: null, fine_note: null, fine_adjusted_at: null });
+    const after = emp ? E.resolveDay(emp, record.date, E.buildContext()).fine : 0;
+    if (emp && after !== before) push.employee(emp, { kind: 'info', title: `Your fine for ${prettyDate(record.date)} is Rs ${after}`, body: 'The admin set it back to the normal rules.', url: '/#history' });
+    return res.json({ success: true, message: `Fine set back to the rules (Rs ${after}).`, record: saved });
+  }
   const amount = Math.round(Number(new_fine));
   const saved = db.recordAttendance({
     ...record,
@@ -176,6 +183,17 @@ router.post('/attendance/manual-mark', (req, res) => {
   const existing = db.getAttendanceByEmployeeAndDate(emp.id, date) || {};
   const base = { ...existing, id: `att_${date}_${emp.code}`, date, employee_id: emp.id, employee_code: emp.code, employee_name: emp.name };
   const hasFine = fine !== undefined && fine !== null && fine !== '';
+
+  // Admin gives leave for this day directly (no request needed).
+  if (status === 'LEAVE') {
+    const types = ['Sick leave', 'Casual leave', 'Annual leave', 'Field work', 'Emergency'];
+    const type = types.includes(req.body.leave_type) ? req.body.leave_type : 'Casual leave';
+    if (existing.id) db.deleteAttendance(existing.id);
+    const reason = String(note || '').trim().slice(0, 300) || 'Marked by admin';
+    db.addLeave({ employee_id: emp.id, employee_code: emp.code, employee_name: emp.name, kind: 'leave', type, date, end_date: date, reason, fine_applied: hasFine ? Math.max(0, Number(fine)) : 0, status: 'APPROVED', admin_note: 'Marked by admin', reviewed_at: new Date().toISOString(), by_admin: true });
+    push.employee(emp, { kind: 'good', title: `${type} marked for ${prettyDate(date)}`, body: reason, url: '/#history' });
+    return res.json({ success: true, message: `${type} saved.` });
+  }
 
   let record;
   if (status === 'ABSENT') {
@@ -210,6 +228,43 @@ router.post('/attendance/manual-mark', (req, res) => {
 router.delete('/attendance/:id', (req, res) => {
   db.deleteAttendance(req.params.id);
   res.json({ success: true, message: 'Record removed.' });
+});
+
+// ---------- Waive many fines at once ----------
+// { date } waives everyone's fines that day (e.g. heavy rain), { employee_id, month } waives
+// one person's month, and both together narrow it down.
+router.post('/fines/waive', (req, res) => {
+  const { employee_id, date, month } = req.body;
+  const note = String(req.body.note || '').trim().slice(0, 200) || 'Waived by admin';
+  const ctx = E.buildContext();
+  let from, to;
+  if (isDate(date)) { from = to = date; }
+  else if (/^\d{4}-\d{2}$/.test(month || '')) { const b = E.monthBounds(`${month}-01`); from = b.from; to = b.to < ctx.todayKey ? b.to : ctx.todayKey; }
+  else return res.status(400).json({ success: false, message: 'Pick a day or a month.' });
+  if (to > ctx.todayKey) to = ctx.todayKey;
+  const people = employee_id ? [db.getEmployeeById(employee_id)].filter(Boolean) : db.getEmployees().filter(e => e.status === 'active');
+  if (!people.length) return res.status(404).json({ success: false, message: 'Employee not found.' });
+
+  let count = 0, total = 0;
+  const now = new Date().toISOString();
+  for (const emp of people) {
+    let empTotal = 0;
+    for (const day of E.employeeRange(emp, from, to, ctx).days) {
+      if (!day.fine) continue;
+      if (day.status === 'LEAVE' && day.requestId) {
+        db.updateLeave(day.requestId, { fine_applied: 0 });
+      } else if (['PRESENT', 'LATE', 'ABSENT'].includes(day.status)) {
+        const rec = db.getAttendanceByEmployeeAndDate(emp.id, day.date) || { id: `att_${day.date}_${emp.code}`, date: day.date, employee_id: emp.id, employee_code: emp.code, employee_name: emp.name, check_in: null, check_out: null, status: 'ABSENT', late_minutes: 0, auto_fine: 0 };
+        db.recordAttendance({ ...rec, adjusted_fine: 0, fine_note: note, fine_adjusted_at: now });
+      } else continue;
+      count++; empTotal += day.fine;
+    }
+    if (empTotal) {
+      total += empTotal;
+      push.employee(emp, { kind: 'good', title: `Rs ${empTotal} of fines waived`, body: `${from === to ? prettyDate(from) : `${prettyDate(from)} – ${prettyDate(to)}`}. ${note}`, url: '/#history' });
+    }
+  }
+  res.json({ success: true, message: count ? `Waived ${count} fine${count === 1 ? '' : 's'} (Rs ${total}).` : 'There were no fines to waive.', count, total });
 });
 
 // ---------- Employees ----------
@@ -319,6 +374,13 @@ router.get('/leaves', (req, res) => {
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map(l => ({ ...l, avatar_color: employees.get(l.employee_id)?.avatar_color || '#6b7280' }));
   res.json({ success: true, leaves });
+});
+
+router.delete('/leaves/:id', (req, res) => {
+  const leave = db.getLeaves().find(l => l.id === req.params.id);
+  if (!leave) return res.status(404).json({ success: false, message: 'Request not found.' });
+  db.deleteLeave(leave.id);
+  res.json({ success: true, message: 'Request deleted.' });
 });
 
 router.post('/leaves/review', (req, res) => {

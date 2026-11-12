@@ -298,6 +298,7 @@
         iconBtn('manual', 'plus', 'Add attendance'))}
       <div style="display:flex;gap:8px">${dateNav}${d.isToday ? '' : `<button class="btn" data-go="${state.today}">Today</button>`}</div>
       <div class="chips scroll" role="group" aria-label="Filter">${filters.map(([k, l]) => `<button class="chip" data-filter="${k}" aria-pressed="${attFilter === k}">${l}<b>${count(k)}</b></button>`).join('')}</div>
+      ${count('fined') ? `<button class="btn btn-s btn-ghost" id="waiveDay" style="justify-self:start">Waive all fines on this day (${rs(d.rows.reduce((t, r) => t + (r.day.fine || 0), 0))})</button>` : ''}
       <section class="card flush" id="attList"></section>`;
 
     function paint() {
@@ -319,6 +320,7 @@
     paint();
 
     view.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { location.hash = `#attendance/${b.dataset.go}`; }));
+    $('#waiveDay')?.addEventListener('click', () => waiveFines({ date: d.date }, `all fines on ${dateLong(d.date)}`, () => renderAttendance(d.date)));
     $('#attDate').addEventListener('change', e => { if (e.target.value) location.hash = `#attendance/${e.target.value}`; });
     view.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
       attFilter = b.dataset.filter;
@@ -357,13 +359,21 @@
             <input class="input" name="amount" type="number" min="0" step="10" inputmode="numeric" value="${current}" required>
           </div>
           <label class="field"><span>Note for the employee</span><input class="input" name="note" maxlength="200" placeholder="For example: it was raining, waived this time"></label>
+          ${day.adjusted ? `<button type="button" class="btn btn-ghost btn-block" data-reset style="margin-top:4px">Use the rules again (${rs(auto)})</button>` : ''}
           <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-primary" type="submit">Save fine</button></div>
         </form>`
     });
     const form = s.el.querySelector('#fineForm');
-    form.addEventListener('click', e => {
+    form.addEventListener('click', async e => {
       const c = e.target.closest('[data-amt]');
       if (c) { form.amount.value = c.dataset.amt; form.querySelectorAll('[data-amt]').forEach(x => x.setAttribute('aria-pressed', x === c)); }
+      const r = e.target.closest('[data-reset]');
+      if (r) await withBusy(r, async () => {
+        try {
+          const res = await call('/fine/adjust', { method: 'POST', body: { reset: true, ...(day.attendanceId ? { attendance_id: day.attendanceId } : { employee_code: emp.code, date: day.date }) } });
+          toast(res.message); s.close(); done && done();
+        } catch (err) { toast(err.message, 'bad'); }
+      });
     });
     form.addEventListener('submit', async e => {
       e.preventDefault();
@@ -379,20 +389,31 @@
     });
   }
 
+  // ---------- Waive many fines at once ----------
+  async function waiveFines(body, what, done) {
+    const r = await confirmSheet({
+      title: 'Waive fines?', sub: `This sets ${what} to Rs 0. Each person gets a notification.`, confirm: 'Waive', tone: 'good',
+      extra: '<label class="field"><span>Note for employees (optional)</span><input class="input" data-value maxlength="200" placeholder="For example: heavy rain today"></label>'
+    });
+    if (!r.ok) return;
+    try { toast((await call('/fines/waive', { method: 'POST', body: { ...body, note: r.value } })).message); done && done(); } catch (err) { toast(err.message, 'bad'); }
+  }
+
   // ---------- Manual entry ----------
   async function openManual({ employee, day, date, done }) {
     let list;
     try { list = (await employees()).filter(e => e.status === 'active' || (employee && e.id === employee.id)); } catch (err) { return toast(err.message, 'bad'); }
     const d = day || {};
     const t = x => (x ? new Date(x).toTimeString().slice(0, 5) : '');
-    let mode = d.status === 'ABSENT' ? 'absent' : 'present';
+    let mode = d.status === 'ABSENT' ? 'absent' : d.status === 'LEAVE' ? 'leave' : 'present';
     const s = sheet({
       title: employee ? `Attendance for ${firstName(employee.name)}` : 'Add attendance',
       sub: 'For a dead phone or a forgotten check-in.',
       body: `<form id="manForm" novalidate>
         <label class="field"><span>Employee</span><select class="input" name="emp" ${employee ? 'disabled' : ''}>${list.map(e => `<option value="${esc(e.code)}" ${employee && e.id === employee.id ? 'selected' : ''}>${esc(e.name)} (${esc(e.code)})</option>`).join('')}</select></label>
         <label class="field"><span>Date</span><input class="input" type="date" name="date" value="${date || state.today}" max="${state.today}"></label>
-        <div class="seg" role="group" aria-label="Status" style="margin-bottom:14px"><button type="button" data-mode="present" aria-pressed="${mode === 'present'}">Present</button><button type="button" data-mode="absent" aria-pressed="${mode === 'absent'}">Absent</button></div>
+        <div class="seg" role="group" aria-label="Status" style="margin-bottom:14px"><button type="button" data-mode="present" aria-pressed="${mode === 'present'}">Present</button><button type="button" data-mode="absent" aria-pressed="${mode === 'absent'}">Absent</button><button type="button" data-mode="leave" aria-pressed="${mode === 'leave'}">Leave</button></div>
+        <label class="field" data-leave><span>Leave type</span><select class="input" name="leave_type">${['Casual leave', 'Sick leave', 'Annual leave', 'Field work', 'Emergency'].map(t => `<option>${t}</option>`).join('')}</select></label>
         <div class="row-2" data-times><label class="field"><span>Check in</span><input class="input" type="time" name="in" value="${t(d.checkIn) || '09:30'}"></label><label class="field"><span>Check out</span><input class="input" type="time" name="out" value="${t(d.checkOut)}"></label></div>
         <label class="field"><span>Fine</span><input class="input" type="number" min="0" step="10" name="fine" placeholder="Leave empty to use the rules" value="${d.adjusted ? d.fine : ''}"></label>
         <label class="field"><span>Note</span><input class="input" name="note" maxlength="200" placeholder="For example: phone battery was dead"></label>
@@ -400,7 +421,7 @@
       </form>`
     });
     const form = s.el.querySelector('#manForm');
-    const syncMode = () => { form.querySelector('[data-times]').hidden = mode === 'absent'; form.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode)); };
+    const syncMode = () => { form.querySelector('[data-times]').hidden = mode !== 'present'; form.querySelector('[data-leave]').hidden = mode !== 'leave'; form.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode)); };
     syncMode();
     form.addEventListener('click', async e => {
       const m = e.target.closest('[data-mode]');
@@ -413,7 +434,7 @@
     });
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      const body = { employee_code: employee ? employee.code : form.emp.value, date: form.date.value, status: mode === 'absent' ? 'ABSENT' : undefined, check_in_time: form.in.value, check_out_time: form.out.value, fine: form.fine.value, note: form.note.value };
+      const body = { employee_code: employee ? employee.code : form.emp.value, date: form.date.value, status: mode === 'absent' ? 'ABSENT' : mode === 'leave' ? 'LEAVE' : undefined, leave_type: form.leave_type.value, check_in_time: form.in.value, check_out_time: form.out.value, fine: form.fine.value, note: form.note.value };
       await withBusy(e.submitter, async () => {
         try {
           const res = await call('/attendance/manual-mark', { method: 'POST', body });
@@ -538,6 +559,7 @@
         </div>
         <div>
           <div class="card-head"><h3>Fines</h3>${fines.totalDue ? pill('DUE', `${rs(fines.totalDue)} due`) : pill('PAID', 'All paid')}</div>
+          ${sm.finalFine ? `<button class="btn btn-s btn-ghost" data-waive-month style="margin:-4px 0 6px -12px">Waive all ${monthName(p.from)} fines (${rs(sm.finalFine)})</button>` : ''}
           ${fineMonths.length ? fineMonths.map(x => `
             <div class="kv" style="align-items:center"><span>${monthName(x.month + '-01')}<br><small class="muted">${rs(x.fine)} fine${x.paid ? `, ${rs(x.paid)} paid` : ''}</small></span>
               ${x.due ? `<button class="btn btn-s btn-good" data-pay="${x.month}">Mark ${rs(x.due)} paid</button>` : '<span class="good small">Paid</span>'}</div>`).join('') : '<p class="muted">No fines yet.</p>'}
@@ -564,6 +586,7 @@
       const d = keyToDate(p.from); d.setMonth(d.getMonth() + Number(b.dataset.pm));
       paintProfile(s, id, dateKey(d).slice(0, 7));
     }));
+    s.body.querySelector('[data-waive-month]')?.addEventListener('click', () => waiveFines({ employee_id: e.id, month: m }, `all of ${esc(firstName(e.name))}'s fines for ${monthName(p.from)}`, () => paintProfile(s, id, m)));
     s.body.querySelectorAll('[data-pay]').forEach(b => b.addEventListener('click', () => {
       const x = fines.months.find(y => y.month === b.dataset.pay);
       openPayment(e, x, () => paintProfile(s, id, m));
@@ -727,11 +750,19 @@
           <div class="who">${avatar({ name: l.employee_name, avatar_color: l.avatar_color })}<div class="grow"><b>${esc(l.employee_name)}</b><small>${esc(l.type)}${l.kind === 'excuse' ? ' (reason)' : ''}, ${l.end_date !== l.date ? `${dateShort(l.date)} – ${dateShort(l.end_date)}` : dateMed(l.date)} · ${ago(l.created_at)}</small></div>${pill(l.status, l.status === 'PENDING' ? 'Pending' : undefined)}</div>
           <p style="margin:8px 0 0">${esc(l.reason)}</p>
           ${l.admin_note ? `<div class="note-line">You: ${esc(l.admin_note)}${l.fine_applied ? ` (fine ${rs(l.fine_applied)})` : ''}</div>` : ''}
+          ${l.status !== 'PENDING' ? `<div class="btn-row" style="margin-top:8px"><button class="btn btn-s btn-ghost" data-review="${esc(l.id)}" data-st="${l.status === 'APPROVED' ? 'REJECTED' : 'APPROVED'}">Change to ${l.status === 'APPROVED' ? 'rejected' : 'approved'}</button><button class="btn btn-s btn-ghost btn-danger" data-del-req="${esc(l.id)}">${icon('trash', 'icon-s')}Delete</button></div>` : ''}
           ${l.status === 'PENDING' ? `<div class="btn-row" style="margin-top:10px"><button class="btn btn-s btn-good" data-review="${esc(l.id)}" data-st="APPROVED">${icon('check', 'icon-s')}Approve</button><button class="btn btn-s" data-review="${esc(l.id)}" data-st="REJECTED">Reject</button></div>` : ''}
         </div>`).join('')
         : `<div class="empty"><h3>${reqFilter === 'PENDING' ? 'All done' : 'Nothing here'}</h3><p>${reqFilter === 'PENDING' ? 'New requests show up here. Turn on notifications in Settings to hear about them.' : ''}</p></div>`;
     }
     paint();
+    $('#reqBox').addEventListener('click', async e => {
+      const b = e.target.closest('[data-del-req]');
+      if (!b) return;
+      const ok = await confirmSheet({ title: 'Delete this request?', sub: 'If it was an approved leave, those days count normally again.', confirm: 'Delete', tone: 'solid-danger' });
+      if (!ok.ok) return;
+      try { toast((await call(`/leaves/${encodeURIComponent(b.dataset.delReq)}`, { method: 'DELETE' })).message); renderRequests(); } catch (err) { toast(err.message, 'bad'); }
+    });
     view.querySelectorAll('[data-rf]').forEach(b => b.addEventListener('click', () => { reqFilter = b.dataset.rf; view.querySelectorAll('[data-rf]').forEach(x => x.setAttribute('aria-pressed', x === b)); paint(); }));
   }
 

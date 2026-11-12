@@ -163,6 +163,24 @@ const server = app.listen(PORT, async () => {
     const newAdmin = await request('GET', '/api/admin/dashboard', null, { Authorization: `Bearer ${pw.body.token}` });
     ok('changing the admin password signs out other devices but keeps this one', pw.status === 200 && oldAdmin.status === 401 && newAdmin.status === 200);
 
+    // ---------- Admin can fix anything ----------
+    const A2 = { Authorization: `Bearer ${pw.body.token}` };
+    const day = E.dateKey();
+    await request('POST', '/api/admin/fine/adjust', { employee_code: 'EMP-999', date: day, new_fine: 400 }, A2);
+    const reset = await request('POST', '/api/admin/fine/adjust', { employee_code: 'EMP-999', date: day, reset: true }, A2);
+    ok('admin can set a fine back to the rules', reset.status === 200 && reset.body.record.adjusted_fine === null);
+    await request('POST', '/api/admin/fine/adjust', { employee_code: 'EMP-999', date: day, new_fine: 300 }, A2);
+    const waive = await request('POST', '/api/admin/fines/waive', { date: day, note: 'Rain' }, A2);
+    const afterWaive = await request('GET', `/api/admin/attendance?date=${day}`, null, A2);
+    ok('admin can waive every fine on a day at once', waive.status === 200 && waive.body.count >= 1 && afterWaive.body.rows.every(r => !r.day.fine));
+    const lv = await request('POST', '/api/admin/attendance/manual-mark', { employee_code: 'EMP-999', date: day, status: 'LEAVE', leave_type: 'Sick leave', note: 'Called in sick' }, A2);
+    const lvDay = await request('GET', `/api/admin/attendance?date=${day}`, null, A2);
+    ok('admin can mark a day as leave directly', lv.status === 200 && lvDay.body.rows.find(r => r.employee.id === 'EMP-999').day.status === 'LEAVE');
+    const adminLeave = db.getLeaves().find(l => l.by_admin && l.employee_id === 'EMP-999');
+    const flip = await request('POST', '/api/admin/leaves/review', { leave_id: adminLeave.id, status: 'REJECTED' }, A2);
+    const del = await request('DELETE', `/api/admin/leaves/${adminLeave.id}`, null, A2);
+    ok('admin can change and delete a decided request', flip.status === 200 && flip.body.leave.status === 'REJECTED' && del.status === 200 && !db.getLeaves().some(l => l.id === adminLeave.id));
+
     // ---------- Security ----------
     ok('an empty office IP list lets nobody check in (fails closed)', E.isAllowedOfficeIP('1.2.3.4', []) === false);
     const crossSite = await request('POST', '/api/me/requests', { kind: 'leave', reason: 'x'.repeat(10) }, { ...U2, Origin: 'https://evil.example' });

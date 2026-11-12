@@ -47,6 +47,6 @@
     "decisions": true,
     "announcements": true
   },
-  "admin_password_hash": "c0ecf1fd377e45b46c53f582fbf615526e23c3a3d987e6547cfc2c3163f4469e4d89f4148a0356eb1971c17c71f430ccf4a1282140f10990a52895883a191c34",
-  "admin_password_salt": "8b2b01dfe6e289fc072cb5fa75f02c22"
+  "admin_password_hash": "82158c681d656929c524c87de20923729f4ece098bed8de2972dbdf67f5df85951ea92459dd1340a98674eeb4ffed0e04000100867ebde86a102ff3a5a566718",
+  "admin_password_salt": "i120000.079d65653f056526366e0263093b6ec5"
 }
