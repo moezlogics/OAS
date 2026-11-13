@@ -31,6 +31,8 @@
   "admin_username": "admin",
   "admin_session_version": 0,
   "admin_password_initial": false,
+  "auto_office_ips": [],
+  "office_link_key": "LBzVIcOVjd8XpCamgV1kd2bMVnWZ5UDR",
   "tracking_started_on": "2026-10-01",
   "push_admin": {
     "leave_request": true,
@@ -39,7 +41,8 @@
     "early_checkout": true,
     "morning_summary": true,
     "missed_checkout": true,
-    "device_blocked": true
+    "device_blocked": true,
+    "wifi_blocked": true
   },
   "push_employee": {
     "checkin_reminder": true,

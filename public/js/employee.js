@@ -183,7 +183,7 @@
     const start = toMin(t.startTime) + (t.graceMinutes || 0);
     const end = toMin(t.endTime);
     const canMark = me.wifi.canMark;
-    const wifiHint = canMark ? '' : `<p class="today-hint">${icon('wifiOff', 'icon-s')}Connect to the office WiFi and turn off mobile data.</p>`;
+    const wifiHint = canMark ? '' : `<p class="today-hint">${icon('wifiOff', 'icon-s')}Connect to the office WiFi and turn off mobile data.</p><p class="muted small center">Your network: ${esc(me.wifi.clientIP)}. In the office? Tell the admin, they can add it.</p>`;
     const m = { tone: 'good', kicker: '', head: '', sub: '', action: '', times: '' };
 
     if (d.status === 'OFF' || d.status === 'HOLIDAY') {

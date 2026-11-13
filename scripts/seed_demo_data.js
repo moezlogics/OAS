@@ -28,6 +28,8 @@ fs.writeFileSync(path.join(DATA, 'notifications.json'), '[]');
 fs.writeFileSync(path.join(DATA, 'payments.json'), '[]');
 fs.writeFileSync(path.join(DATA, 'push_subscriptions.json'), '[]');
 for (const p of people) db.addEmployee({ ...p, joined_on: p.joined_on || '2026-01-15' });
+// Demo people were "added" long ago, so their past days count normally.
+for (const p of people) db.updateEmployee(p.code, { created_at: `${p.joined_on || '2026-09-30'}T03:00:00.000Z` });
 
 db.updateSettings(s => ({
   ...s,

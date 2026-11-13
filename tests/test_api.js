@@ -201,6 +201,35 @@ const server = app.listen(PORT, async () => {
     ok('5 wrong PINs lock the account even for the right PIN', lockedOut.status === 429);
     ok('new PINs use the stronger hash', !db.isOldHash(db.getEmployeeById('EMP-998').pin_salt));
 
+    // ---------- Office network ----------
+    ok('IPv6: the whole office network matches, even when the phone address changes', E.isAllowedOfficeIP('2400:1:2:3:aaaa::1', [E.officeNetworkFor('2400:1:2:3:ffff::9')]) && !E.isAllowedOfficeIP('2400:1:2:4::1', ['2400:1:2:3::/64']));
+    await request('POST', '/api/admin/employees/add', { code: 'EMP-997', name: 'New Joiner', pin: '2222', joined_on: '2026-01-01' }, A2);
+    const nj = db.getEmployeeById('EMP-997');
+    const lateNight = E.buildContext(new Date(`${E.dateKey()}T23:00:00`));
+    ok('no absent on the day someone is added, even with an old joining date', E.resolveDay(nj, E.dateKey(), lateNight).status === 'NA' && E.resolveDay(nj, E.addDays(E.dateKey(), -3), lateNight).fine === 0);
+    db.updateSettings({ office_ips: ['10.9.9.9'], enforce_ip_attendance: true });
+    const nl = await request('POST', '/api/login', { code: 'EMP-997', pin: '2222' });
+    const NJ = { Authorization: `Bearer ${nl.body.token}` };
+    const blockedIn = await request('POST', '/api/me/check-in', {}, NJ);
+    ok('a blocked check-in is listed for the admin with its network', blockedIn.status === 403 && db.getBlocked().some(b => b.employee_id === 'EMP-997'));
+    await request('POST', '/api/admin/office-ips/add', { network: '127.0.0.1' }, A2);
+    const okIn = await request('POST', '/api/me/check-in', {}, NJ);
+    ok('admin adds that network with one tap and check-in works', okIn.status === 200);
+    db.updateSettings({ office_ips: ['10.9.9.9'] });
+    await request('POST', '/api/admin/office-link', {}, A2);
+    const badLink = await request('GET', '/api/office-ip?key=wrong');
+    const goodLink = await request('GET', `/api/office-ip?key=${db.getSettings().office_link_key}`);
+    ok('the automatic office link saves the current office IP (and needs the secret)', badLink.status === 403 && goodLink.status === 200 && E.isAllowedOfficeIP('127.0.0.1', E.officeIPs(db.getSettings())));
+
+    // ---------- Backup and fresh start ----------
+    const bk = await request('GET', '/api/admin/backup', null, A2);
+    ok('admin can download a full backup', bk.status === 200 && Array.isArray(bk.body.employees) && Array.isArray(bk.body.attendance));
+    const noConfirm = await request('POST', '/api/admin/reset', { password: 'newpass123', confirm: 'no' }, A2);
+    const wrongPw = await request('POST', '/api/admin/reset', { password: 'nope', confirm: 'RESET' }, A2);
+    const reset2 = await request('POST', '/api/admin/reset', { password: 'newpass123', confirm: 'RESET', start_date: E.dateKey() }, A2);
+    ok('reset needs RESET and the admin password', noConfirm.status === 400 && wrongPw.status === 401);
+    ok('reset clears attendance, requests and payments, keeps employees, and saves a backup first', reset2.status === 200 && db.getAttendance().length === 0 && db.getLeaves().length === 0 && db.getEmployees().length >= 3 && db.getSettings().tracking_started_on === E.dateKey() && fs.readdirSync(path.join(tmp, 'backups')).some(n => n.startsWith('before-reset-')));
+
     console.log(`\nAll ${passed} API checks passed.\n`);
     server.close(() => { fs.rmSync(tmp, { recursive: true, force: true }); process.exit(0); });
   } catch (err) {

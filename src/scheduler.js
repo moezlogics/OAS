@@ -23,6 +23,8 @@ function tick(now = new Date()) {
   const ctx = E.buildContext(now);
   const s = ctx.settings;
   const today = ctx.todayKey;
+  // Nightly backup at 11:30 PM (keeps the last 14 days in data/backups/).
+  if (ctx.nowMinutes >= 23 * 60 + 30) once(`${today}:backup`, () => db.backup('daily', 14));
   if (ctx.holidays.has(today) || (s.weekly_off_days || []).includes(now.getDay())) return;
 
   const start = ctx.startMinutes + (Number(s.grace_minutes) || 0);

@@ -181,6 +181,21 @@ If your hosting has **Setup Node.js App** in cPanel: create an app with root `of
 
 ---
 
+### "Not on office WiFi" while in the office?
+The app checks the office's **public** internet address. Three things make it change:
+1. **IPv6.** Phones often use IPv6, and those addresses change every few hours. The app now saves the whole office IPv6 network (`…::/64`) when you tap **Add this network**, so this is handled. Simplest of all: in your DNS, keep only the **A record** for `office` (no AAAA record), so every phone uses IPv4.
+2. **The internet provider changes the IP** (dynamic IP). Fix: Settings → **Automatic office IP** → Create the office link → **Copy Windows command**, and paste it once into Command Prompt (as admin) on an office PC that stays on. It reports the office IP every 5 minutes. Or ask your provider for a static IP.
+3. **Two internet lines** (load balancing). Tap **Add this network** once while on each line.
+
+When someone is blocked, their screen shows their network, and Settings → **Recently blocked** lists it with an **Add** button. You also get a push notification.
+
+### Starting fresh after testing
+Settings → **Data** → **Reset all data**. It clears attendance, fines, payments, requests and notifications, keeps employees and settings (unless you choose to remove employees), and starts counting from the date you pick. A backup is saved first in `data/backups/`.
+
+Backups: one is made every night at 11:30 PM (last 14 kept, in `data/backups/`), and **Download backup** in Settings saves a copy to your computer.
+
+New employees are never marked absent on the day they are added, or any day before it.
+
 ### Admin password not working?
 - `ADMIN_PASSWORD` in `.env` must be **at least 8 characters**. Shorter ones are ignored (the log says so: `pm2 logs office-attendance`).
 - After editing `.env`, restart: `pm2 restart office-attendance`. The new value is applied on start.

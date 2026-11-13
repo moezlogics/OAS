@@ -1,18 +1,18 @@
 [
   {
-    "id": "ntf_mwc6m66f_e1b76f",
+    "id": "ntf_mweqnigo_45635a",
     "employee_id": "all",
     "title": "Friday prayer break: 12:30 to 2:00",
     "body": "Work starts again at 2. Check-out is still at 5.",
     "kind": "announcement",
-    "created_at": "2026-11-11T13:55:51.111Z"
+    "created_at": "2026-11-13T08:52:18.360Z"
   },
   {
-    "id": "ntf_mwc6m66m_7f16ab",
+    "id": "ntf_mweqnigr_e8421f",
     "employee_id": "EMP-102",
     "title": "Sick leave (4 Nov) approved",
     "body": "Get well soon",
     "kind": "good",
-    "created_at": "2026-11-11T13:55:51.118Z"
+    "created_at": "2026-11-13T08:52:18.363Z"
   }
 ]

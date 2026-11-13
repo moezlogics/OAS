@@ -974,6 +974,7 @@
     ['missed_checkout', 'Missed check-outs', 'One hour after closing: who forgot to check out.'],
     ['early_checkout', 'Early check-outs', 'When someone leaves before closing time.'],
     ['device_blocked', 'Sign-in on a new phone', 'When someone is blocked by the one-phone rule.'],
+    ['wifi_blocked', 'Check-in blocked', 'When someone can\'t check in because their network isn\'t on the office list.'],
     ['every_checkin', 'Every check-in', 'Also notify for on-time check-ins. Can be a lot.']
   ];
   const EMP_EVENTS = [
@@ -1046,18 +1047,34 @@
 
           <section class="card">
             <div class="card-head"><h3>Office WiFi lock</h3></div>
-            <p class="muted small">Check-in only works from these IP addresses. Sit in the office and tap "Add my IP". That is your router's public IP.</p>
+            <p class="muted small">Check-in only works from these networks. Sit in the office on the WiFi and tap "Add this network".</p>
+            <div class="notice ${r.onOfficeNetwork ? 'good' : 'warn'}" style="margin-top:10px">${icon(r.onOfficeNetwork ? 'wifi' : 'wifiOff')}<div><b>${r.onOfficeNetwork ? 'You are on an office network' : 'This network is not on the list'}</b><p>Your network: ${esc(r.currentNetwork)}${r.currentNetwork.includes(':') ? ' (IPv6: the whole network is saved, because phone addresses change every few hours)' : ''}</p></div></div>
             <div class="ip-list" id="ipList"></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <input class="input" id="ipInput" placeholder="e.g. 182.180.11.45 or 192.168.1.0/24" style="flex:1;min-width:180px">
               <button type="button" class="btn" id="ipAdd">Add</button>
             </div>
-            <button type="button" class="btn btn-primary btn-block" id="ipMine" style="margin-top:8px">${icon('wifi', 'icon-s')}Add my IP (${esc(myIP)})</button>
+            <button type="button" class="btn btn-primary btn-block" id="ipMine" style="margin-top:8px">${icon('wifi', 'icon-s')}Add this network (${esc(r.currentNetwork)})</button>
+            <p class="muted small" style="margin-top:6px">Office has two internet lines? Add the network once from each line.</p>
             <div style="margin-top:8px">
               ${sw('enforce_ip_attendance', s.enforce_ip_attendance, 'Check-in only on office WiFi', 'If off, people can check in from any internet.')}
               ${sw('bind_device', s.bind_device, 'One phone per employee', 'Stops someone checking in for a colleague. Reset the phone in Team if someone changes it.')}
               ${sw('enforce_ip_admin', s.enforce_ip_admin, 'Admin panel only on office WiFi', 'Add your own IP first, or you will be locked out.')}
             </div>
+            ${r.blocked.length ? `<div class="card-head" style="margin-top:12px"><h3>Recently blocked</h3></div>
+              <p class="muted small">If these people were in the office, add their network.</p>
+              <div class="list">${r.blocked.slice(0, 6).map(b => `<div class="row"><span class="grow"><span class="title">${esc(b.network)}</span><span class="sub">${esc(b.employee_name)} · ${ago(b.at)}</span></span><button type="button" class="btn btn-s" data-add-net="${esc(b.network)}">Add</button></div>`).join('')}</div>` : ''}
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h3>Automatic office IP</h3></div>
+            <p class="muted small">If your internet's IP keeps changing, use this. An office computer (or the router) opens a secret link every few minutes, and the app always knows the office's current IP.</p>
+            ${r.officeLink ? `
+              <label class="field" style="margin-top:10px"><span>Secret link (keep private)</span><input class="input" id="officeLink" readonly value="${esc(r.officeLink)}"></label>
+              <div class="btn-row"><button type="button" class="btn btn-s" id="copyLink">Copy link</button><button type="button" class="btn btn-s" id="copyTask">Copy Windows command</button><button type="button" class="btn btn-s btn-ghost btn-danger" id="linkOff">Turn off</button></div>
+              <p class="muted small" style="margin-top:10px">On an office PC that stays on, open Command Prompt as admin and paste the Windows command once. It opens the link every 5 minutes. Routers with "DDNS / custom URL" can open the link too.</p>
+              <div style="margin-top:8px">${r.autoOfficeIPs.length ? r.autoOfficeIPs.slice().reverse().map(a => `<div class="kv"><span>${esc(a.ip)}</span><span>${ago(a.seen_at)}</span></div>`).join('') : '<p class="muted small">Waiting for the first report from the office…</p>'}</div>`
+            : '<button type="button" class="btn btn-block" id="linkOn" style="margin-top:10px">Create the office link</button>'}
           </section>
 
           <section class="card">
@@ -1078,6 +1095,13 @@
         <section class="card">
           <div class="card-head"><h3>Announcements</h3><button class="btn btn-s" data-act="announce">${icon('megaphone', 'icon-s')}New</button></div>
           <div class="list" id="annList">${ann.announcements.length ? ann.announcements.map(a => `<div class="row"><div class="grow"><span class="title">${esc(a.title)}</span><span class="sub">${a.body ? esc(a.body) + ' · ' : ''}${ago(a.created_at)}</span></div><button class="icon-btn" data-ann-del="${esc(a.id)}" aria-label="Remove announcement">${icon('trash', 'icon-s')}</button></div>`).join('') : '<p class="muted small">No announcements yet.</p>'}</div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Data</h3></div>
+          <p class="muted small">Everything is saved in JSON files on the server. A backup is made every night at 11:30 PM (last 14 days kept).</p>
+          <div class="btn-row" style="margin-top:10px"><a class="btn btn-s" href="/api/admin/backup" download>${icon('download', 'icon-s')}Download backup</a></div>
+          <div class="kv" style="margin-top:10px"><span>Counting started</span><b>${s.tracking_started_on ? dateMed(s.tracking_started_on) : '—'}</b></div>
+          <button type="button" class="btn btn-block btn-danger" id="resetAll" style="margin-top:10px">${icon('trash', 'icon-s')}Reset all data (fresh start)</button>
         </section>
         <section class="card">
           <div class="card-head"><h3>Admin password</h3></div>
@@ -1139,7 +1163,19 @@
     const addIP = v => { v = v.trim(); if (!v) return; if (!ips.includes(v)) ips.push(v); paintIPs(); };
     $('#ipAdd').addEventListener('click', () => { addIP($('#ipInput').value); $('#ipInput').value = ''; });
     $('#ipInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#ipAdd').click(); } });
-    $('#ipMine').addEventListener('click', () => { addIP(myIP); toast(`${myIP} added. Remember to save.`); });
+    $('#ipMine').addEventListener('click', () => { addIP(r.currentNetwork); toast(`${r.currentNetwork} added. Remember to save.`); });
+    view.querySelectorAll('[data-add-net]').forEach(b => b.addEventListener('click', async () => {
+      try { toast((await call('/office-ips/add', { method: 'POST', body: { network: b.dataset.addNet } })).message); renderSettings(); } catch (err) { toast(err.message, 'bad'); }
+    }));
+    $('#linkOn')?.addEventListener('click', async () => { try { toast((await call('/office-link', { method: 'POST' })).message); renderSettings(); } catch (err) { toast(err.message, 'bad'); } });
+    $('#linkOff')?.addEventListener('click', async () => {
+      const ok = await confirmSheet({ title: 'Turn off the office link?', sub: 'IPs reported by it are removed. Networks you added by hand stay.', confirm: 'Turn off', tone: 'solid-danger' });
+      if (ok.ok) try { toast((await call('/office-link', { method: 'DELETE' })).message); renderSettings(); } catch (err) { toast(err.message, 'bad'); }
+    });
+    const copy = async (text, msg) => { try { await navigator.clipboard.writeText(text); toast(msg); } catch (e) { $('#officeLink').select(); toast('Select the link and copy it.', 'warn'); } };
+    $('#copyLink')?.addEventListener('click', () => copy(r.officeLink, 'Link copied.'));
+    $('#copyTask')?.addEventListener('click', () => copy(`schtasks /create /tn "Office attendance IP" /sc minute /mo 5 /ru SYSTEM /f /tr "curl.exe -s \\"${r.officeLink}\\""`, 'Windows command copied.'));
+    $('#resetAll').addEventListener('click', openReset);
     $('#holAdd').addEventListener('click', () => {
       const date = $('#holDate').value;
       if (!date) return toast('Pick a date.', 'warn');
@@ -1182,6 +1218,36 @@
           if (res.token) { token = res.token; store(TOKEN_KEY, token); }
           toast(res.message);
           f.reset();
+        } catch (err) { toast(err.message, 'bad'); }
+      });
+    });
+  }
+
+  // ---------- Fresh start ----------
+  function openReset() {
+    const s = sheet({
+      title: 'Reset all data?',
+      sub: 'For a fresh start after testing. A backup is saved first.',
+      body: `<form id="resetForm" novalidate>
+        <div class="notice bad" style="margin-bottom:14px">${icon('alert')}<p>This deletes all attendance, fines, payments, requests and notifications. Settings stay.</p></div>
+        <label class="field"><span>Start counting from</span><input class="input" type="date" name="start" value="${state.today}"><small>Days before this are never counted as absent.</small></label>
+        <label class="switch-row" style="padding-top:0"><span class="grow"><b>Also remove all employees</b><span>Leave off to keep the team and their PINs.</span></span><span class="switch"><input type="checkbox" name="emps"><i></i></span></label>
+        <label class="field" style="margin-top:8px"><span>Your admin password</span><input class="input" type="password" name="pw" autocomplete="current-password"></label>
+        <label class="field"><span>Type RESET to confirm</span><input class="input" name="confirm" autocomplete="off" autocapitalize="characters"></label>
+        <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn btn-solid-danger" type="submit">Reset everything</button></div>
+      </form>`
+    });
+    s.el.querySelector('#resetForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      await withBusy(e.submitter, async () => {
+        try {
+          const res = await call('/reset', { method: 'POST', body: { start_date: f.start.value, remove_employees: f.emps.checked, password: f.pw.value, confirm: f.confirm.value } });
+          toast(res.message);
+          s.close();
+          state.employees = null;
+          location.hash = '#dashboard';
+          route();
         } catch (err) { toast(err.message, 'bad'); }
       });
     });

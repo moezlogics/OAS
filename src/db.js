@@ -61,6 +61,8 @@ const PAYMENTS_FILE = path.join(DATA_DIR, 'payments.json');
 const PUSH_FILE = path.join(DATA_DIR, 'push_subscriptions.json');
 const PUSH_STATE_FILE = path.join(DATA_DIR, 'push_state.json');
 const FIRST_PASSWORD_FILE = path.join(DATA_DIR, 'FIRST_ADMIN_PASSWORD.txt');
+const BLOCKED_FILE = path.join(DATA_DIR, 'blocked_checkins.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
 // Soft, readable avatar colours — one is picked per employee.
 const AVATAR_COLORS = ['#2E4BD6', '#12805C', '#B4540A', '#7A3FC4', '#0E7490', '#BE185D', '#4D7C0F', '#9F1239'];
@@ -84,6 +86,8 @@ const DEFAULT_SETTINGS = {
   admin_username: 'admin',
   admin_session_version: 0,
   admin_password_initial: false, // true until the admin changes the first password
+  auto_office_ips: [], // [{ ip, seen_at }] reported by the automatic office link
+  office_link_key: null, // secret for the automatic office link (created from Settings)
   tracking_started_on: null, // days before this never count as absent (set on first run)
   // Push notifications. Each switch can be turned off from Settings.
   push_admin: {
@@ -93,7 +97,8 @@ const DEFAULT_SETTINGS = {
     early_checkout: true,    // someone leaves before closing time
     morning_summary: true,   // 30 min after start: who is in, late, not in yet
     missed_checkout: true,   // 1 hour after closing: who forgot to check out
-    device_blocked: true     // someone tried to sign in on a second phone
+    device_blocked: true,    // someone tried to sign in on a second phone
+    wifi_blocked: true       // check-in blocked from a network that isn't on the office list
   },
   push_employee: {
     checkin_reminder: true,  // 15 min before start, if not checked in yet
@@ -108,6 +113,7 @@ function normalizeSettings(s) {
   if (!Array.isArray(merged.weekly_off_days)) merged.weekly_off_days = [0];
   if (!Array.isArray(merged.holidays)) merged.holidays = [];
   if (!Array.isArray(merged.office_ips)) merged.office_ips = [];
+  if (!Array.isArray(merged.auto_office_ips)) merged.auto_office_ips = [];
   merged.push_admin = { ...DEFAULT_SETTINGS.push_admin, ...(s && s.push_admin) };
   merged.push_employee = { ...DEFAULT_SETTINGS.push_employee, ...(s && s.push_employee) };
   return merged;
@@ -238,6 +244,7 @@ const db = {
   verifyPassword,
   isOldHash,
   DATA_DIR,
+  BACKUP_DIR,
   FIRST_PASSWORD_FILE,
   AVATAR_COLORS,
 
@@ -407,6 +414,68 @@ const db = {
   },
   paidFor(employeeId, month) {
     return this.getPayments().filter(p => p.employee_id === employeeId && p.month === month).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  },
+
+  // ---------- Office network helpers ----------
+  // Blocked check-ins, so the admin can see which network people are really on.
+  getBlocked() {
+    return readJSON(BLOCKED_FILE) || [];
+  },
+  addBlocked({ ip, network, employee_id, employee_name }) {
+    const list = this.getBlocked().filter(b => !(b.network === network && b.employee_id === employee_id));
+    list.push({ ip, network, employee_id, employee_name, at: new Date().toISOString() });
+    safeWriteJSON(BLOCKED_FILE, list.slice(-30));
+  },
+  clearBlocked(network) {
+    safeWriteJSON(BLOCKED_FILE, network ? this.getBlocked().filter(b => b.network !== network) : []);
+  },
+  // Called by the automatic office link: remember the office's current public IP.
+  recordAutoOfficeIP(network) {
+    return this.updateSettings(s => {
+      const list = (s.auto_office_ips || []).filter(a => a.ip !== network);
+      list.push({ ip: network, seen_at: new Date().toISOString() });
+      return { ...s, auto_office_ips: list.slice(-6) };
+    });
+  },
+
+  // ---------- Backups ----------
+  // One JSON file with everything (except secrets), in data/backups/.
+  snapshot() {
+    const out = { created_at: new Date().toISOString(), version: 1 };
+    for (const [key, file] of Object.entries({ settings: SETTINGS_FILE, employees: EMPLOYEES_FILE, attendance: ATTENDANCE_FILE, leaves: LEAVES_FILE, payments: PAYMENTS_FILE, notifications: NOTIFICATIONS_FILE })) {
+      out[key] = readJSON(file);
+    }
+    return out;
+  },
+  backup(label = 'daily', keep = 14) {
+    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true, mode: 0o700 });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const file = path.join(BACKUP_DIR, `${label}-${stamp}.json`);
+    safeWriteJSON(file, this.snapshot());
+    const old = fs.readdirSync(BACKUP_DIR).filter(n => n.startsWith(`${label}-`)).sort();
+    for (const n of old.slice(0, Math.max(0, old.length - keep))) fs.unlinkSync(path.join(BACKUP_DIR, n));
+    return file;
+  },
+
+  // ---------- Fresh start ----------
+  // Clears attendance, fines, requests, payments and notifications. Employees and
+  // settings stay (unless removeEmployees). Nothing before startDate counts.
+  resetData({ startDate, removeEmployees = false }) {
+    const backupFile = this.backup('before-reset', 10);
+    safeWriteJSON(ATTENDANCE_FILE, []);
+    safeWriteJSON(LEAVES_FILE, []);
+    safeWriteJSON(PAYMENTS_FILE, []);
+    safeWriteJSON(NOTIFICATIONS_FILE, []);
+    safeWriteJSON(BLOCKED_FILE, []);
+    safeWriteJSON(PUSH_STATE_FILE, { sent: {} });
+    if (removeEmployees) {
+      safeWriteJSON(EMPLOYEES_FILE, []);
+      safeWriteJSON(PUSH_FILE, this.getPushSubs().filter(x => x.owner === 'admin'));
+    } else {
+      safeWriteJSON(EMPLOYEES_FILE, this.getEmployees().map(e => ({ ...e, notifications_seen_at: null })));
+    }
+    this.updateSettings(s => ({ ...s, tracking_started_on: startDate }));
+    return backupFile;
   },
 
   // ---------- Push subscriptions ----------

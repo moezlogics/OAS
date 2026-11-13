@@ -16,7 +16,7 @@ router.post('/login', (req, res) => {
 
   const settings = db.getSettings();
   const clientIP = E.getClientIP(req);
-  if (settings.enforce_ip_admin && !E.isAllowedOfficeIP(clientIP, settings.office_ips)) {
+  if (settings.enforce_ip_admin && !E.isAllowedOfficeIP(clientIP, E.officeIPs(settings))) {
     return res.status(403).json({ success: false, message: `Admin sign-in only works on the office WiFi. Your IP: ${clientIP}` });
   }
 
@@ -457,6 +457,11 @@ router.get('/settings', (req, res) => {
       push_employee: s.push_employee
     },
     currentAdminIP: E.getClientIP(req),
+    currentNetwork: E.officeNetworkFor(E.getClientIP(req)),
+    onOfficeNetwork: E.isAllowedOfficeIP(E.getClientIP(req), E.officeIPs(s)),
+    autoOfficeIPs: s.auto_office_ips || [],
+    officeLink: s.office_link_key ? `${process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`}/api/office-ip?key=${s.office_link_key}` : null,
+    blocked: db.getBlocked().slice().reverse(),
     // On a live server the admin's IP should never look local. If it does, Nginx isn't passing the real IP.
     ipLooksWrong: process.env.NODE_ENV === 'production' && /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|fc|fd)/i.test(E.getClientIP(req))
   });
@@ -479,7 +484,8 @@ router.put('/settings', (req, res) => {
   const finalIps = ips || current.office_ips;
   const lockOn = b.enforce_ip_attendance !== undefined ? !!b.enforce_ip_attendance : current.enforce_ip_attendance;
   const adminLockOn = b.enforce_ip_admin !== undefined ? !!b.enforce_ip_admin : current.enforce_ip_admin;
-  if ((lockOn || adminLockOn) && finalIps.length === 0) {
+  const autoIps = E.officeIPs({ ...current, office_ips: [] });
+  if ((lockOn || adminLockOn) && finalIps.length === 0 && autoIps.length === 0) {
     return res.status(400).json({ success: false, message: 'Add at least one office IP before turning on the WiFi lock.' });
   }
   if (ips && ips.some(ip => ip.length > 60 || !/^[0-9a-fA-F:.*\/]+$/.test(ip))) {
@@ -511,6 +517,45 @@ router.put('/settings', (req, res) => {
   });
 
   res.json({ success: true, message: 'Settings saved.', settings: { ...updated, admin_password_hash: undefined, admin_password_salt: undefined } });
+});
+
+// ---------- Office network shortcuts ----------
+router.post('/office-ips/add', (req, res) => {
+  const network = String(req.body.network || '').trim();
+  if (!network || network.length > 60 || !/^[0-9a-fA-F:.*\/]+$/.test(network)) return res.status(400).json({ success: false, message: 'Not a valid IP.' });
+  db.updateSettings(s => ({ ...s, office_ips: s.office_ips.includes(network) ? s.office_ips : [...s.office_ips, network] }));
+  db.clearBlocked(network);
+  res.json({ success: true, message: `${network} added as an office network.` });
+});
+
+router.post('/office-link', (req, res) => {
+  const key = require('crypto').randomBytes(24).toString('base64url');
+  db.updateSettings({ office_link_key: key });
+  res.json({ success: true, message: 'New office link created. The old one stops working.' });
+});
+
+router.delete('/office-link', (req, res) => {
+  db.updateSettings({ office_link_key: null, auto_office_ips: [] });
+  res.json({ success: true, message: 'Office link turned off.' });
+});
+
+// ---------- Backup and fresh start ----------
+router.get('/backup', (req, res) => {
+  const name = `attendance-backup-${E.dateKey()}.json`;
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.type('application/json').send(JSON.stringify(db.snapshot(), null, 2));
+});
+
+router.post('/reset', (req, res) => {
+  const { password, confirm, start_date, remove_employees } = req.body;
+  const s = db.getSettings();
+  if (String(confirm || '').trim().toUpperCase() !== 'RESET') return res.status(400).json({ success: false, message: 'Type RESET to confirm.' });
+  if (!db.verifyPassword(String(password || ''), s.admin_password_hash, s.admin_password_salt)) {
+    return res.status(401).json({ success: false, message: 'Your admin password is wrong.' });
+  }
+  const start = isDate(start_date) ? start_date : E.dateKey();
+  const backupFile = db.resetData({ startDate: start, removeEmployees: !!remove_employees });
+  res.json({ success: true, message: `All data cleared. Counting starts ${prettyDate(start)}. A backup was saved first.`, backup: require('path').basename(backupFile) });
 });
 
 router.post('/settings/change-password', (req, res) => {

@@ -1,7 +1,7 @@
 // Service worker: makes the app installable, opens even when offline,
 // and receives push notifications.
 // Attendance data (/api) is NEVER cached, so numbers are always live.
-const VERSION = 'v11';
+const VERSION = 'v12';
 const PAGES = `pages-${VERSION}`;
 const FONTS = 'fonts-v1';
 const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/badge-96.png', '/icon.svg'];

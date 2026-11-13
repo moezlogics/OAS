@@ -25,7 +25,7 @@ function timings(settings) {
 
 function wifiState(req, settings) {
   const clientIP = E.getClientIP(req);
-  const onOffice = E.isAllowedOfficeIP(clientIP, settings.office_ips);
+  const onOffice = E.isAllowedOfficeIP(clientIP, E.officeIPs(settings));
   return { clientIP, isOfficeWifi: onOffice, ipEnforced: !!settings.enforce_ip_attendance, canMark: !settings.enforce_ip_attendance || onOffice };
 }
 
@@ -42,6 +42,25 @@ router.get('/status', (req, res) => {
 });
 
 router.get('/push/key', (req, res) => res.json({ success: true, publicKey: push.publicKey() }));
+
+// ---------- Automatic office link ----------
+// An office PC or the router opens this URL every few minutes. Whatever public IP it
+// comes from is saved as an office IP, so a changing office IP never breaks check-in.
+function officeLink(req, res) {
+  const key = String(req.query.key || '');
+  const saved = db.getSettings().office_link_key || '';
+  const a = Buffer.from(key);
+  const b = Buffer.from(saved);
+  if (!saved || a.length !== b.length || !require('crypto').timingSafeEqual(a, b)) {
+    return res.status(403).type('text/plain').send('Wrong or old link. Copy the link again from Settings.');
+  }
+  const ip = E.getClientIP(req);
+  const network = E.officeNetworkFor(ip);
+  db.recordAutoOfficeIP(network);
+  res.type('text/plain').send(`OK, office network saved: ${network}`);
+}
+router.get('/office-ip', officeLink);
+router.post('/office-ip', officeLink);
 
 // ---------- Employee sign in ----------
 router.post('/login', (req, res) => {

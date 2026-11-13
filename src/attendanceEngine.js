@@ -33,22 +33,61 @@ function isAllowedOfficeIP(clientIP, officeIPs) {
     if (client === allowed) return true;
     if (isLocal(client) && isLocal(allowed)) return true;
     if (allowed.endsWith('*') && client.startsWith(allowed.slice(0, -1))) return true;
-    if (allowed.includes('/') && ipInCIDR(client, allowed)) return true;
+    if (ipInCIDR(client, allowed)) return true; // CIDR ranges, and exact matches in any IPv6 spelling
   }
   return false;
 }
 
-function ipInCIDR(ip, cidr) {
-  try {
-    const [range, bitsStr = '32'] = cidr.split('/');
-    const bits = Number(bitsStr);
-    if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return false;
-    const toLong = v => v.split('.').reduce((acc, o) => (acc << 8) + parseInt(o, 10), 0) >>> 0;
-    const mask = bits === 0 ? 0 : (~(2 ** (32 - bits) - 1)) >>> 0;
-    return (toLong(ip) & mask) === (toLong(range) & mask);
-  } catch (e) {
-    return false;
+// IPv4 or IPv6 address -> { v: 4|6, n: BigInt } (null if not an address).
+function parseIP(ip) {
+  ip = String(ip || '').trim().toLowerCase().replace(/^::ffff:(?=\d+\.)/, '');
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    const parts = ip.split('.').map(Number);
+    if (parts.some(p => p > 255)) return null;
+    return { v: 4, n: parts.reduce((acc, p) => (acc << 8n) + BigInt(p), 0n) };
   }
+  if (!ip.includes(':') || !/^[0-9a-f:]+$/.test(ip)) return null;
+  const [head, tail = null] = ip.split('::');
+  if (ip.split('::').length > 2) return null;
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const missing = 8 - h.length - t.length;
+  if (tail === null ? h.length !== 8 : missing < 1) return null;
+  const groups = [...h, ...Array(tail === null ? 0 : missing).fill('0'), ...t];
+  if (groups.some(g => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return { v: 6, n: groups.reduce((acc, g) => (acc << 16n) + BigInt(parseInt(g, 16)), 0n) };
+}
+
+function ipInCIDR(ip, cidr) {
+  const [range, bitsStr] = String(cidr).split('/');
+  const a = parseIP(ip);
+  const r = parseIP(range);
+  if (!a || !r || a.v !== r.v) return false;
+  const size = a.v === 4 ? 32 : 128;
+  const bits = bitsStr === undefined ? size : Number(bitsStr);
+  if (!(bits >= 0 && bits <= size)) return false;
+  const shift = BigInt(size - bits);
+  return (a.n >> shift) === (r.n >> shift);
+}
+
+// What to save for "Add my IP". IPv6 addresses change every few hours on phones,
+// so for IPv6 we save the office's whole network (/64) instead of one address.
+function officeNetworkFor(ip) {
+  const p = parseIP(ip);
+  if (!p) return ip;
+  if (p.v === 4) return String(ip).replace(/^::ffff:/, '');
+  const prefix = p.n >> 64n;
+  const groups = [];
+  for (let i = 3; i >= 0; i--) groups.push(((prefix >> BigInt(i * 16)) & 0xffffn).toString(16));
+  return `${groups.join(':')}::/64`;
+}
+
+// All office IPs: the ones the admin added plus the ones reported by the automatic
+// office link in the last 3 days (for internet connections whose IP keeps changing).
+function officeIPs(settings) {
+  const cutoff = Date.now() - 3 * 86400000;
+  const auto = (settings.auto_office_ips || []).filter(a => new Date(a.seen_at).getTime() > cutoff).map(a => a.ip);
+  return [...(settings.office_ips || []), ...auto];
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +265,11 @@ function resolveDay(emp, key, ctx) {
 
   if (isFuture) return { ...base, status: 'UPCOMING', pendingLeave: !!(leave && leave.status === 'PENDING'), fine: 0, autoFine: 0 };
   if (!dayOver) return { ...base, status: 'NOT_YET', pendingLeave: !!(leave && leave.status === 'PENDING'), fine: 0, autoFine: 0 };
+
+  // Never absent on (or before) the day the person was added to the app:
+  // they couldn't have checked in, so it isn't their fault.
+  const addedKey = emp.created_at ? dateKey(new Date(emp.created_at)) : null;
+  if (addedKey && key <= addedKey) return { ...base, status: 'NA', label: 'Added this day', fine: 0, autoFine: 0 };
 
   if (leave && leave.status === 'PENDING') {
     return { ...base, status: 'PENDING', leaveType: leave.type, reason: leave.reason, requestId: leave.id, fine: 0, autoFine: 0 };
@@ -472,6 +516,9 @@ module.exports = {
   fineBalance,
   getClientIP,
   isAllowedOfficeIP,
+  officeIPs,
+  officeNetworkFor,
+  parseIP,
   calculateLateFine,
   finePreview,
   evaluateCheckout,

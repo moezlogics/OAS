@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const db = require('./db');
-const { getClientIP, isAllowedOfficeIP } = require('./attendanceEngine');
+const { getClientIP, isAllowedOfficeIP, officeIPs, officeNetworkFor, dateKey } = require('./attendanceEngine');
 
 const fs = require('fs');
 const path = require('path');
@@ -144,7 +144,7 @@ function requireAdmin(req, res, next) {
 
   if (settings.enforce_ip_admin) {
     const clientIP = getClientIP(req);
-    if (!isAllowedOfficeIP(clientIP, settings.office_ips)) {
+    if (!isAllowedOfficeIP(clientIP, officeIPs(settings))) {
       return res.status(403).json({ success: false, message: `The admin panel only opens on the office WiFi. Your IP: ${clientIP}`, clientIP });
     }
   }
@@ -175,12 +175,26 @@ function requireOfficeIP(req, res, next) {
   const settings = db.getSettings();
   const clientIP = getClientIP(req);
   req.clientIP = clientIP;
-  if (settings.enforce_ip_attendance && !isAllowedOfficeIP(clientIP, settings.office_ips)) {
+  if (settings.enforce_ip_attendance && !isAllowedOfficeIP(clientIP, officeIPs(settings))) {
+    // Remember it so the admin can add the network with one tap if it really is the office.
+    const network = officeNetworkFor(clientIP);
+    if (req.employee) {
+      db.addBlocked({ ip: clientIP, network, employee_id: req.employee.id, employee_name: req.employee.name });
+      const key = `${dateKey()}:blocked:${network}`;
+      if (!db.wasPushSent(key)) {
+        db.markPushSent(key);
+        require('./push').admin('wifi_blocked', {
+          title: 'Check-in blocked',
+          body: `${req.employee.name} tried to check in from network ${network}. If they are in the office, add it in Settings → Office WiFi.`,
+          url: '/admin#settings', tag: `blocked-${network}`
+        });
+      }
+    }
     return res.status(403).json({
       success: false,
       isOfficeWifi: false,
       clientIP,
-      message: 'You are not on the office WiFi. Turn off mobile data, connect to the office WiFi and try again.'
+      message: `You are not on the office WiFi (your network: ${clientIP}). Turn off mobile data and connect to the office WiFi. If you are in the office, tell the admin.`
     });
   }
   next();

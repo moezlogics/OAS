@@ -6,13 +6,13 @@
     "designation": "Senior Developer",
     "department": "Software",
     "phone": "0300-1234567",
-    "pin_hash": "dd723dfd25efd3a4327c83f8f22c3eded567b71724b9b7cf20b8dedbfcef1899959dbac1aa657b93d55fe51e185338babd6b41de392df5038b3a45adbba52fa2",
-    "pin_salt": "fe11ff8c71d2c41916709f0f8ab6ea17",
+    "pin_hash": "4cb2d8912b01a180dde4780dd1f11f0a8cbb21395fccd73be88cf3f33948c74609308ae7def61f5c5adc522942037578b474b3c7c9402a1d629b7f06c5f9d847",
+    "pin_salt": "i120000.9c0486dc490f0d18b851678d80257ae6",
     "avatar_color": "#2E4BD6",
     "joined_on": "2026-01-15",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:50.916Z"
+    "created_at": "2026-09-30T03:00:00.000Z"
   },
   {
     "id": "EMP-102",
@@ -21,13 +21,13 @@
     "designation": "UI/UX Designer",
     "department": "Creative",
     "phone": "0312-9876543",
-    "pin_hash": "27e705e1d476ee54f1a5320aff2615b605c6acb14a6c71095edf048915b8d5161ecd71ff79e27f22f475f775a14b05314b89c1e352216efc305c05e9757a2f85",
-    "pin_salt": "fd243e6681eda8a893fe4f472ae7781a",
+    "pin_hash": "4dbc32cb9ee2eec3286a3bd8a1d2056dcddbc9389d403438a5c67222be1216d15b09298ac1c3656813fefc62db5c828ea59abbc86531ea552c10f7311578327c",
+    "pin_salt": "i120000.974d967f45ba8c8fee551ea9a5a2b1e6",
     "avatar_color": "#12805C",
     "joined_on": "2026-01-15",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:50.940Z"
+    "created_at": "2026-09-30T03:00:00.000Z"
   },
   {
     "id": "EMP-103",
@@ -36,13 +36,13 @@
     "designation": "HR & Operations",
     "department": "Management",
     "phone": "0321-4567890",
-    "pin_hash": "ed8f354110037bdfb5892d4267205754626618b7cd36113f74b540ef25df35d9b5fabf7da3af740d0ee274780152488052cf6a9e7406688297db43a42e5eb347",
-    "pin_salt": "a43e0bc84200aac5046e6e62cd37a0d4",
+    "pin_hash": "e843d62bb143d45563962aee48a5413d93440b6dac88f2146d19a0f49e4ec0a1085548e5acd7e6a10d220e3a6c88098062c4df081d5c2eb375356936ec81d558",
+    "pin_salt": "i120000.97247a5b07f5e935d1a6b038c5bd0192",
     "avatar_color": "#B4540A",
     "joined_on": "2026-01-15",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:50.959Z"
+    "created_at": "2026-09-30T03:00:00.000Z"
   },
   {
     "id": "EMP-104",
@@ -51,13 +51,13 @@
     "designation": "Digital Marketing",
     "department": "Marketing",
     "phone": "0333-7654321",
-    "pin_hash": "64caa5e9a7ee3d151412f99cf73cf2ba803d128349d3c73fd1730c5254e0954f810792bd11efb2ef93a1425f748eb37e881a2297c164ed10ea94f265039ed23e",
-    "pin_salt": "1945d577281b16ac974f23756cd16858",
+    "pin_hash": "5040780528c2f40b519ef97b746d4fab9d69b17cb6c1c2a563c29f5a58e0904bcbb1fbcd6e5c67a60a343c0b0ab04504e1852194b8e9061aecef512a356fde27",
+    "pin_salt": "i120000.30c5db7daec80a20fe22db2538358e89",
     "avatar_color": "#7A3FC4",
     "joined_on": "2026-01-15",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:50.980Z"
+    "created_at": "2026-09-30T03:00:00.000Z"
   },
   {
     "id": "EMP-105",
@@ -66,13 +66,13 @@
     "designation": "Accounts Officer",
     "department": "Finance",
     "phone": "0345-2233445",
-    "pin_hash": "56b547067d306b4c200bddfcacb7d3a081d15b7c799afcca9d0df0875b2efd29631e347b5f46dc1cd7271ca02f9a550c4c708beadc05a4684b8d02c6378a9e10",
-    "pin_salt": "bcf3ee3809a365a5d7ece81a466a9c96",
+    "pin_hash": "fcb562db8d035382a04e812156738a3bbc0e28e7518c693d3051e4998a07c8131f980bcb73bb1c4eb59dee99add6e4d944be8d40774c1032236a9adf1c4efcd0",
+    "pin_salt": "i120000.5a89105565fcfd447be04ff385395b98",
     "avatar_color": "#0E7490",
     "joined_on": "2026-01-15",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:51.002Z"
+    "created_at": "2026-09-30T03:00:00.000Z"
   },
   {
     "id": "EMP-106",
@@ -81,12 +81,12 @@
     "designation": "Sales Executive",
     "department": "Sales",
     "phone": "0301-5566778",
-    "pin_hash": "f550af84d4c16e2e6cc01e3ddf9fcfe311bebc1f79697b160d9918d6426a50d320762aea73eafbe147b5974dc6b0a2a8d77599170937adf413e5a25402dddf5d",
-    "pin_salt": "8f713cbcfea82f9751e9871bfe438eba",
+    "pin_hash": "b9c08557ebed84c5d7bfc21b57271ef20929167fa12acc495fb851900f3bbab31ad91d016e07b8687b1975e32b22f6091c924b65599d9c742b7edca0a1575430",
+    "pin_salt": "i120000.c6d1e9df835da6e612a04a9c299ba51a",
     "avatar_color": "#BE185D",
     "joined_on": "2026-10-20",
     "status": "active",
     "device_id": null,
-    "created_at": "2026-11-11T13:55:51.023Z"
+    "created_at": "2026-10-20T03:00:00.000Z"
   }
 ]
